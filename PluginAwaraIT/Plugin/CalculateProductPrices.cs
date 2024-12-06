@@ -129,7 +129,7 @@ namespace PluginAwaraIT.Workflow
                 // Установка выходных параметров
                 BasePrice.Set(context, new Money(price));
                 PriceAfterDiscount.Set(context, new Money(priceAfterDiscount));
-                tracingService.Trace($"BasePrice отправлен: {price}");
+                tracingService.Trace($"BasePrice отправле: {price}");
                 tracingService.Trace($"PriceAfterDiscount отправлен: {priceAfterDiscount}");
 
                 tracingService.Trace("Выполнение CalculateProductPrices завершено успешно.");
