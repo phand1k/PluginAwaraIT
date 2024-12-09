@@ -1,4 +1,5 @@
 ﻿using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
 using PluginAwaraIT.Mapping;
 using PluginAwaraIT.Repositories.Implementations;
 using System;
@@ -87,12 +88,14 @@ namespace PluginAwaraIT.Plugin
                 tracingService.Trace($"Назначен наименее загруженный пользователь: {leastLoadedUser}");
 
                 tracingService.Trace("Создание 'Возможной сделки'...");
+
                 var possibleDeal = new Entity("nk_nkpossibledeal")
                 {
                     ["nk_nkclientid"] = postImage.GetAttributeValue<EntityReference>("nk_clientid"),
                     ["nk_nkstatuscode"] = new OptionSetValue(1),
                     ["nk_territoryid"] = new EntityReference("nk_nkcountries", territoryId.Value),
                     ["ownerid"] = new EntityReference("systemuser", leastLoadedUser),
+                    ["nk_name"] = $"Возможная сделка №{Guid.NewGuid()}"
                 };
 
                 var possibleDealId = service.Create(possibleDeal);

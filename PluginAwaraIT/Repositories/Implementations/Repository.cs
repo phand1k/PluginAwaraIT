@@ -18,6 +18,9 @@ namespace PluginAwaraIT.Repositories.Implementations
         {
             _service = service;
         }
+
+
+
         public int GetUserLoadForCallCenter(Guid userId, ITracingService tracingService)
         {
             tracingService.Trace($"Получение загрузки для пользователя с ID: {userId}");

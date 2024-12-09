@@ -9,12 +9,12 @@ namespace PluginAwaraIT.Workflow
 {
     public class CalculateProductPrices : CodeActivity
     {
-        [Input("DealId")]
+        [Input("dealid")]
         [ReferenceTarget("nk_nkpossibledeal")] // Логическое имя таблицы "Возможная сделка"
 
         public InArgument<EntityReference> DealId { get; set; }
 
-        [Input("CourseId")]
+        [Input("nk_courseid")]
         [ReferenceTarget("nk_nkcourses")] // Логическое имя таблицы "Курсы"
         public InArgument<EntityReference> CourseId { get; set; }
 
@@ -43,56 +43,41 @@ namespace PluginAwaraIT.Workflow
                 // Получение входных параметров
                 var dealId = DealId.Get(context);
                 var courseId = CourseId.Get(context);
+                var discount = Discount.Get(context);
 
                 if (dealId == null || courseId == null)
                 {
                     throw new InvalidWorkflowException("DealId и CourseId обязательны для выполнения.");
                 }
 
-                var discount = Discount.Get(context);
-
                 tracingService.Trace($"DealId: {dealId.Id}, CourseId: {courseId.Id}, Discount: {discount}");
 
-                // Получение данных сделки
-                var deal = service.Retrieve("nk_nkpossibledeal", dealId.Id, new ColumnSet("nk_territoryid"));
-                var territoryId = deal.GetAttributeValue<EntityReference>("nk_territoryid")?.Id;
-                tracingService.Trace($"Территория сделки: {territoryId}");
+                // Шаг 1: Получение данных курса
+                tracingService.Trace("Получение данных курса...");
+                var course = service.Retrieve("nk_nkcourses", courseId.Id, new ColumnSet("nk_preparationformatcourseid", "nk_formatcourseid", "nk_territoryid"));
+                var preparationFormatId = course.GetAttributeValue<EntityReference>("nk_preparationformatcourseid")?.Id;
+                var formatCourseId = course.GetAttributeValue<EntityReference>("nk_formatcourseid")?.Id;
+                var territoryId = course.GetAttributeValue<EntityReference>("nk_territoryid")?.Id;
 
-                // Поиск активного прайс-листа
-                var currentDate = DateTime.UtcNow;
-                var priceListQuery = new QueryExpression("nk_nkpricelistcourses")
-                {
-                    ColumnSet = new ColumnSet("nk_nkpricelistcoursesid"),
-                    Criteria = new FilterExpression
-                    {
-                        Conditions =
-                {
-                    new ConditionExpression("nk_startdate", ConditionOperator.LessEqual, currentDate),
-                    new ConditionExpression("nk_enddate", ConditionOperator.GreaterEqual, currentDate)
-                }
-                    }
-                };
+                tracingService.Trace($"Данные курса: PreparationFormatId: {preparationFormatId}, FormatCourseId: {formatCourseId}, TerritoryId: {territoryId}");
 
-                var priceLists = service.RetrieveMultiple(priceListQuery);
-                if (!priceLists.Entities.Any())
+                if (preparationFormatId == null || formatCourseId == null || territoryId == null)
                 {
-                    throw new InvalidWorkflowException("Активный прайс-лист не найден.");
+                    throw new InvalidWorkflowException("Некоторые данные курса отсутствуют (формат подготовки, формат проведения или территория).");
                 }
 
-                var activePriceListId = priceLists.Entities[0].Id;
-                tracingService.Trace($"Активный прайс-лист: {activePriceListId}");
-
-                // Поиск позиции прайс-листа
+                // Шаг 2: Поиск позиции прайс-листа
+                tracingService.Trace("Поиск позиции прайс-листа...");
                 var query = new QueryExpression("nk_pricelistposition")
                 {
-                    ColumnSet = new ColumnSet("nk_price", "nk_preparationformatid", "nk_conductformatid"),
+                    ColumnSet = new ColumnSet("nk_price"),
                     Criteria = new FilterExpression
                     {
                         Conditions =
                 {
-                    new ConditionExpression("nk_territoryid", ConditionOperator.Equal, territoryId),
-                    new ConditionExpression("nk_courseid", ConditionOperator.Equal, courseId.Id),
-                    new ConditionExpression("nk_pricelistid", ConditionOperator.Equal, activePriceListId)
+                    new ConditionExpression("nk_preparationformatid", ConditionOperator.Equal, preparationFormatId),
+                    new ConditionExpression("nk_conductformatid", ConditionOperator.Equal, formatCourseId),
+                    new ConditionExpression("nk_territoryid", ConditionOperator.Equal, territoryId)
                 }
                     }
                 };
@@ -112,27 +97,31 @@ namespace PluginAwaraIT.Workflow
                     throw new InvalidWorkflowException("Цена в позиции прайс-листа отсутствует.");
                 }
                 var price = priceMoney.Value;
-                var preparationFormatId = priceListItem.GetAttributeValue<EntityReference>("nk_preparationformatid")?.Id;
-                var conductFormatId = priceListItem.GetAttributeValue<EntityReference>("nk_conductformatid")?.Id;
 
                 tracingService.Trace($"Цена из прайс-листа: {price}");
-                tracingService.Trace($"Форматы: preparationFormatId={preparationFormatId}, conductFormatId={conductFormatId}");
 
-                // Рассчет цены после скидки
-                var priceAfterDiscount = price * (1 - ((decimal)discount / 100));
+                // Шаг 3: Рассчет цены после скидки
+                var priceAfterDiscount = price;
+                if (discount > 100)
+                {
+                    priceAfterDiscount = price - discount;
+                }
+                else
+                {
+                    priceAfterDiscount = price * (1 - ((decimal)discount / 100));
+                }
+                
                 tracingService.Trace($"Цена после скидки (расчет): {priceAfterDiscount}");
-                tracingService.Trace($"BasePrice отправлен: {price}");
-                tracingService.Trace($"PriceAfterDiscount отправлен: {priceAfterDiscount}");
                 BasePrice.Set(context, new Money(price));
                 PriceAfterDiscount.Set(context, new Money(priceAfterDiscount));
+                tracingService.Trace($"Проверка значения PriceAfterDiscount перед отправкой: {priceAfterDiscount}");
+
 
                 // Установка выходных параметров
                 BasePrice.Set(context, new Money(price));
                 PriceAfterDiscount.Set(context, new Money(priceAfterDiscount));
-                tracingService.Trace($"BasePrice отправле: {price}");
+                tracingService.Trace($"BasePrice отправлен: {price}");
                 tracingService.Trace($"PriceAfterDiscount отправлен: {priceAfterDiscount}");
-
-                tracingService.Trace("Выполнение CalculateProductPrices завершено успешно.");
             }
             catch (Exception ex)
             {
@@ -140,6 +129,8 @@ namespace PluginAwaraIT.Workflow
                 throw new InvalidWorkflowException($"Ошибка в действии: {ex.Message}", ex);
             }
         }
+
+
 
     }
 }
