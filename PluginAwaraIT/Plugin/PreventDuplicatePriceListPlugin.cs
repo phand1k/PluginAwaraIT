@@ -47,14 +47,21 @@ namespace PluginAwaraIT.Plugin
                     };
 
                     var existingPriceLists = service.RetrieveMultiple(query);
-
                     if (existingPriceLists.Entities.Count > 0)
                     {
                         tracingService.Trace($"Найдено {existingPriceLists.Entities.Count} пересекающихся прайс-листов.");
                         foreach (var priceList in existingPriceLists.Entities)
                         {
-                            tracingService.Trace($"Прайс-лист ID: {priceList.Id}, Дата начала: {priceList["nk_startdate"]}, Дата окончания: {priceList["nk_enddate"]}");
+                            if (priceList.Id == entity.Id || priceList.Id == Guid.Empty)
+                            {
+                                tracingService.Trace("Пропускаем текущую запись, так как это сама создаваемая запись или запись без идентификатора.");
+                                continue;
+                            }
+
+
+                            tracingService.Trace($"Прайс-лист: {priceList.Id}, nk_startdate: {priceList.GetAttributeValue<DateTime>("nk_startdate")}, nk_enddate: {priceList.GetAttributeValue<DateTime>("nk_enddate")}");
                         }
+
                         tracingService.Trace($"Дата начала нового прайс-листа: {utcNewStartDate}");
                         tracingService.Trace($"Дата окончания нового прайс-листа: {utcNewEndDate}");
                         throw new InvalidPluginExecutionException("Невозможно создать новый прайс-лист, так как существует действующий прайс-лист с пересекающимся периодом действия.");

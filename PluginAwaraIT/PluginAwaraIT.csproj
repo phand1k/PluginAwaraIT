@@ -121,12 +121,14 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Mapping\ColumnMap.cs" />
+    <Compile Include="Plugin\AutoUnpublishPriceListPlugin.cs" />
     <Compile Include="Plugin\CalculateProductPrices.cs" />
     <Compile Include="Plugin\CreateInterestPluginWithPattern.cs" />
     <Compile Include="Plugin\CreateNKCoursePlugin.cs" />
     <Compile Include="Plugin\CreateNKPriceListPosition.cs" />
     <Compile Include="Plugin\CreateProcessInterestStatusPlugin.cs" />
     <Compile Include="Plugin\PreventDuplicatePriceListPlugin.cs" />
+    <Compile Include="Plugin\ScheduleUnpublishPlugin.cs" />
     <Compile Include="Plugin\UpdateDealPricesPlugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Repositories\Implementations\Repository.cs" />
